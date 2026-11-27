@@ -24,7 +24,10 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { user: actor, response } = await requireAdminUser();
-  if (response || !actor) return response;
+  if (response) return response;
+  if (!actor) {
+    return Response.json({ error: "Authentication required" }, { status: 401 });
+  }
 
   const { id } = await params;
   if (!id.trim()) {
@@ -179,7 +182,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { user: actor, response } = await requireAdminUser();
-  if (response || !actor) return response;
+  if (response) return response;
+  if (!actor) {
+    return Response.json({ error: "Authentication required" }, { status: 401 });
+  }
 
   const { id } = await params;
   if (!id.trim()) {

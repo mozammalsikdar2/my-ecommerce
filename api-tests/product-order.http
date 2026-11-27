@@ -1,0 +1,84 @@
+@baseUrl = http://localhost:3000/api
+@adminEmail = {{$dotenv %ADMIN_EMAIL%}}
+@adminPassword = {{$dotenv %ADMIN_PASSWORD%}}
+
+### 1. Log in as an existing admin (set ADMIN_EMAIL and ADMIN_PASSWORD locally)
+# @name adminLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+@token = {{adminLogin.response.body.$.accessToken}}
+
+### 2. Add a product with variants (total stock: 25)
+# @name newProduct
+POST {{baseUrl}}/products
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Royal Oud Attar Collection {{$guid}}",
+  "description": "Long-lasting alcohol-free Arabian oud fragrance",
+  "price": 1200,
+  "discountPrice": 950,
+  "image": "https://images.unsplash.com/photo-1594035910387-fea47794261f?auto=format&fit=crop&w=500&q=80",
+  "isFeatured": true,
+  "variants": [
+    { "size": "6ml", "color": "Gold Bottle", "price": 550, "stock": 15 },
+    { "size": "12ml", "color": "Crystal Bottle", "price": 950, "stock": 10 }
+  ]
+}
+
+@productId = {{newProduct.response.body.$.id}}
+@variantId = {{newProduct.response.body.$.variants[1].id}}
+
+### 3. Edit product details and pricing
+PUT {{baseUrl}}/products/{{productId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Royal Oud Attar Reserve Edition",
+  "discountPrice": 900
+}
+
+### 4. Place a customer order (deducts 2 units)
+# @name placedOrder
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{
+  "customerName": "API Test Customer",
+  "customerPhone": "01711000000",
+  "deliveryAddress": "House 12, Road 4, Dhanmondi, Dhaka",
+  "deliveryZone": "INSIDE_DHAKA",
+  "paymentMethod": "COD",
+  "items": [
+    {
+      "productId": "{{productId}}",
+      "variantId": "{{variantId}}",
+      "quantity": 2
+    }
+  ]
+}
+
+@orderId = {{placedOrder.response.body.$.id}}
+
+### 5. Verify variant stock is 8 and total product stock is 23
+GET {{baseUrl}}/products/{{productId}}
+
+### 6. Cancel the order (restores inventory)
+PATCH {{baseUrl}}/orders/{{orderId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "orderStatus": "CANCELLED"
+}
+
+### 7. Verify variant stock is restored to 10 and total product stock to 25
+GET {{baseUrl}}/products/{{productId}}

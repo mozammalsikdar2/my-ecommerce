@@ -1,0 +1,47 @@
+@baseUrl = http://localhost:3000/api/auth
+@bearerBaseUrl = http://127.0.0.1:3000/api/auth
+@testPassword = LocalTestOnly-Password!42
+
+### Register a unique local test account
+# @name registerReq
+POST {{baseUrl}}/register
+Content-Type: application/json
+
+{
+  "name": "Auth API Test",
+  "email": "auth-test-{{$guid}}@example.com",
+  "password": "{{testPassword}}"
+}
+
+### Verify the current user from the auth cookie
+GET {{baseUrl}}/me
+
+### Log out and revoke the refresh session
+POST {{baseUrl}}/logout
+
+### Log in and receive an access token
+# @name loginReq
+POST {{baseUrl}}/login
+Content-Type: application/json
+
+{
+  "email": "{{registerReq.response.body.$.user.email}}",
+  "password": "{{testPassword}}"
+}
+
+### Verify Bearer authentication without sending the localhost cookie
+@token = {{loginReq.response.body.accessToken}}
+GET {{bearerBaseUrl}}/me
+Authorization: Bearer {{token}}
+
+### Rotate access and refresh tokens using the refresh cookie
+POST {{baseUrl}}/refresh
+
+### Verify the refreshed auth cookie
+GET {{baseUrl}}/me
+
+### Log out
+POST {{baseUrl}}/logout
+
+### Verify logout returns an unauthenticated response
+GET {{baseUrl}}/me

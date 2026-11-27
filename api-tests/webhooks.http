@@ -1,0 +1,36 @@
+@baseUrl = http://localhost:3000/api/webhooks
+@steadfastWebhookSecret = {{$dotenv %STEADFAST_WEBHOOK_SECRET%}}
+@pathaoWebhookSecret = {{$dotenv %PATHAO_WEBHOOK_SECRET%}}
+@orderNumber = ORD-492810-42
+
+### Set STEADFAST_WEBHOOK_SECRET and PATHAO_WEBHOOK_SECRET in your local environment.
+### Replace the example order and consignment IDs with orders actually assigned to each courier.
+### Both courier integrations and webhook secrets must be configured in Admin > Logistics.
+
+### Simulate Steadfast parcel delivered
+POST {{baseUrl}}/steadfast
+Authorization: Bearer {{steadfastWebhookSecret}}
+Content-Type: application/json
+
+{
+  "notification_type": "delivery_status",
+  "consignment_id": "12345678",
+  "invoice": "{{orderNumber}}",
+  "cod_amount": 1010,
+  "status": "delivered",
+  "tracking_message": "Parcel delivered to customer"
+}
+
+### Simulate Pathao parcel returned
+### The webhook must match a Pathao-linked order; the handler checks the live Pathao status.
+POST {{baseUrl}}/pathao
+X-Pathao-Signature: {{pathaoWebhookSecret}}
+Content-Type: application/json
+
+{
+  "event": "order.returned-to-merchant",
+  "consignment_id": "PT-987654321",
+  "merchant_order_id": "{{orderNumber}}",
+  "order_status": "Returned",
+  "order_status_slug": "returned"
+}

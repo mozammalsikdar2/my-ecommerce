@@ -10,6 +10,8 @@ import React, {
 import { useRouter } from "next/navigation";
 import { defaultMenuItems, defaultSettings } from "@/types/settings";
 import type { MenuItem, SiteSettings } from "@/types/settings";
+import { loginSettingsSchema } from "@/types/login-settings";
+import { headerSettingsSchema } from "@/types/header-settings";
 
 export { defaultMenuItems, defaultSettings };
 export type { MenuItem, SiteSettings };
@@ -124,6 +126,10 @@ function parseSettings(value: unknown): SiteSettings | null {
   if (!isRecord(value)) return null;
   const menuItems = parseMenuItems(value.menuItems);
   if (!menuItems) return null;
+  const loginSettings = loginSettingsSchema.safeParse(value);
+  if (!loginSettings.success) return null;
+  const headerSettings = headerSettingsSchema.safeParse(value);
+  if (!headerSettings.success) return null;
 
   const stringFields = [
     "storeName",
@@ -165,6 +171,8 @@ function parseSettings(value: unknown): SiteSettings | null {
   }
 
   return {
+    ...loginSettings.data,
+    ...headerSettings.data,
     storeName: value.storeName as string,
     tagline: value.tagline as string,
     logoUrl: value.logoUrl as string,

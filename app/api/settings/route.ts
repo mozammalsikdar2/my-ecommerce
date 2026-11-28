@@ -7,6 +7,8 @@ import {
 } from "@/lib/api-utils";
 import { requireRole } from "@/lib/auth-guard";
 import type { Prisma } from "@prisma/client";
+import { loginSettingsSchema } from "@/types/login-settings";
+import { headerSettingsSchema } from "@/types/header-settings";
 
 function isSafeLink(value: string) {
   return (
@@ -90,6 +92,8 @@ export async function PUT(request: Request) {
     "deliveryChargeOutside",
   ] as const;
   const allowedFields = new Set<string>([
+    ...Object.keys(loginSettingsSchema.shape),
+    ...Object.keys(headerSettingsSchema.shape),
     ...stringFields,
     ...numberFields,
     "menuItems",
@@ -105,6 +109,34 @@ export async function PUT(request: Request) {
 
   const update: Prisma.SiteSettingsUpdateInput = {};
   const create: Prisma.SiteSettingsCreateInput = { id: 1 };
+  const loginFields = Object.fromEntries(
+    Object.keys(loginSettingsSchema.shape)
+      .filter((key) => key in body)
+      .map((key) => [key, body[key]]),
+  );
+  const loginSettings = loginSettingsSchema.partial().safeParse(loginFields);
+  if (!loginSettings.success) {
+    return Response.json(
+      { error: loginSettings.error.issues[0]?.message ?? "Invalid login settings" },
+      { status: 400 },
+    );
+  }
+  Object.assign(update, loginSettings.data);
+  Object.assign(create, loginSettings.data);
+  const headerFields = Object.fromEntries(
+    Object.keys(headerSettingsSchema.shape)
+      .filter((key) => key in body)
+      .map((key) => [key, body[key]]),
+  );
+  const headerSettings = headerSettingsSchema.partial().safeParse(headerFields);
+  if (!headerSettings.success) {
+    return Response.json(
+      { error: headerSettings.error.issues[0]?.message ?? "Invalid header settings" },
+      { status: 400 },
+    );
+  }
+  Object.assign(update, headerSettings.data);
+  Object.assign(create, headerSettings.data);
   const menuItems =
     "menuItems" in body ? parseMenuItems(body.menuItems) : undefined;
   if ("menuItems" in body && !menuItems) {

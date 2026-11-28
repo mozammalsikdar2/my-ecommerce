@@ -11,7 +11,7 @@ import { staffAuthorizationError } from "@/lib/user-auth";
 export async function GET() {
   try {
     const categories = await prisma.category.findMany({
-      orderBy: { name: "asc" },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       include: {
         subCategories: {
           orderBy: { name: "asc" },
@@ -121,7 +121,7 @@ export async function POST(request: Request) {
         error.code === "P2002"
       ) {
         return Response.json(
-          { error: "A category with this slug already exists" },
+          { error: "A category with this name or slug already exists" },
           { status: 409 },
         );
       }

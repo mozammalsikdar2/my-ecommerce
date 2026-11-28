@@ -157,7 +157,9 @@ export async function PUT(request: Request, { params }: RouteContext) {
     ) {
       return Response.json(
         {
-          error: `A ${isSubCategory ? "subcategory" : "category"} with this slug already exists`,
+          error: isSubCategory
+            ? "A subcategory with this slug already exists"
+            : "A category with this name or slug already exists",
         },
         { status: 409 },
       );
@@ -196,6 +198,16 @@ export async function DELETE(request: Request, { params }: RouteContext) {
     if (isSubCategory) {
       await prisma.subCategory.delete({ where: { id } });
     } else {
+      const product = await prisma.product.findFirst({
+        where: { categoryId: id },
+        select: { id: true },
+      });
+      if (product) {
+        return Response.json(
+          { error: "Cannot delete a category containing products. Move or remove the products first." },
+          { status: 409 },
+        );
+      }
       await prisma.category.delete({ where: { id } });
     }
     return Response.json({ message: "Deleted successfully" });
@@ -207,6 +219,16 @@ export async function DELETE(request: Request, { params }: RouteContext) {
       return Response.json(
         { error: `${isSubCategory ? "Subcategory" : "Category"} not found` },
         { status: 404 },
+      );
+    }
+    if (
+      !isSubCategory &&
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2003"
+    ) {
+      return Response.json(
+        { error: "Cannot delete a category containing products. Move or remove the products first." },
+        { status: 409 },
       );
     }
     throw error;

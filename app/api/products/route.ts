@@ -13,113 +13,10 @@ import {
   slugifyProductName,
 } from "@/lib/product-utils";
 import { staffAuthorizationError } from "@/lib/user-auth";
+import { listProducts } from "@/lib/product-list";
 
 export async function GET(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const categoryId = searchParams.get("categoryId")?.trim();
-    const category = searchParams.get("category")?.trim();
-    const subCategoryId = searchParams.get("subCategoryId")?.trim();
-    const search = searchParams.get("search")?.trim();
-    const featured = searchParams.get("featured");
-    const flashSale = searchParams.get("flashSale");
-    const inStock = searchParams.get("inStock") === "true";
-    const lowStock = searchParams.get("lowStock") === "true";
-    const minPriceParam = searchParams.get("minPrice")?.trim() || null;
-    const maxPriceParam = searchParams.get("maxPrice")?.trim() || null;
-    const minPrice = minPriceParam === null ? null : Number(minPriceParam);
-    const maxPrice = maxPriceParam === null ? null : Number(maxPriceParam);
-    const sort = searchParams.get("sort") || "newest";
-    const includeInactive = searchParams.get("includeInactive") === "true";
-
-    if (
-      (minPrice !== null && (!Number.isFinite(minPrice) || minPrice < 0)) ||
-      (maxPrice !== null && (!Number.isFinite(maxPrice) || maxPrice < 0)) ||
-      (minPrice !== null && maxPrice !== null && minPrice > maxPrice)
-    ) {
-      return Response.json(
-        { error: "Price filters must be non-negative numbers with minPrice <= maxPrice" },
-        { status: 400 },
-      );
-    }
-    if (!["newest", "price_asc", "price_desc"].includes(sort)) {
-      return Response.json(
-        { error: "sort must be newest, price_asc, or price_desc" },
-        { status: 400 },
-      );
-    }
-
-    if (includeInactive) {
-      const authError = await staffAuthorizationError(request);
-      if (authError) return authError;
-    }
-
-    const orderBy =
-      sort === "price_asc"
-        ? { price: "asc" as const }
-        : sort === "price_desc"
-          ? { price: "desc" as const }
-          : { createdAt: "desc" as const };
-
-    const where: Prisma.ProductWhereInput = {
-      ...(!includeInactive ? { isActive: true } : {}),
-      ...(categoryId && categoryId !== "ALL" ? { categoryId } : {}),
-      ...(subCategoryId ? { subCategoryId } : {}),
-      ...(featured === "true" ? { isFeatured: true } : {}),
-      ...(flashSale === "true" ? { isFlashSale: true } : {}),
-      ...(inStock && lowStock
-        ? { stock: { gt: 0, lte: 5 } }
-        : inStock
-          ? { stock: { gt: 0 } }
-          : lowStock
-            ? { stock: { lte: 5 } }
-            : {}),
-      ...(minPrice !== null || maxPrice !== null
-        ? {
-            price: {
-              ...(minPrice !== null ? { gte: minPrice } : {}),
-              ...(maxPrice !== null ? { lte: maxPrice } : {}),
-            },
-          }
-        : {}),
-    };
-    const andConditions: Prisma.ProductWhereInput[] = [];
-    if (
-      (!categoryId || categoryId === "ALL") &&
-      category &&
-      category !== "ALL"
-    ) {
-      andConditions.push({
-        OR: [
-          { categoryId: category },
-          { category: { is: { slug: category } } },
-        ],
-      });
-    }
-    if (search) {
-      andConditions.push({
-        OR: [
-          { name: { contains: search, mode: "insensitive" } },
-          { description: { contains: search, mode: "insensitive" } },
-        ],
-      });
-    }
-    if (andConditions.length > 0) where.AND = andConditions;
-
-    const products = await prisma.product.findMany({
-      where,
-      orderBy,
-      include: {
-        category: { select: { id: true, name: true, slug: true } },
-        subCategory: { select: { id: true, name: true, slug: true } },
-        variants: true,
-      },
-    });
-    return Response.json(products);
-  } catch (error) {
-    console.error("GET /api/products error:", error);
-    return Response.json({ error: "Failed to fetch products" }, { status: 500 });
-  }
+  return listProducts(request);
 }
 
 export async function POST(request: Request) {
@@ -137,6 +34,7 @@ export async function POST(request: Request) {
     price,
     discountPrice,
     stock,
+    sku,
     isFeatured,
     isFlashSale,
     isActive,
@@ -175,6 +73,13 @@ export async function POST(request: Request) {
     (typeof stock !== "number" || !Number.isSafeInteger(stock) || stock < 0)
   ) {
     return Response.json({ error: "stock must be a non-negative integer" }, { status: 400 });
+  }
+  if (
+    sku !== undefined &&
+    sku !== null &&
+    (typeof sku !== "string" || sku.trim().length > 100)
+  ) {
+    return Response.json({ error: "sku must be a string of at most 100 characters or null" }, { status: 400 });
   }
   if (typeof image !== "string" || (image !== "" && !isHttpUrl(image))) {
     return Response.json({ error: "image must be an HTTP or HTTPS URL" }, { status: 400 });
@@ -227,7 +132,7 @@ export async function POST(request: Request) {
   const computedStock =
     validVariants.length > 0
       ? validVariants.reduce((sum, variant) => sum + variant.stock, 0)
-      : stock ?? 0;
+      : stock ?? 25;
   if (!Number.isSafeInteger(computedStock)) {
     return Response.json(
       { error: "Combined variant stock exceeds the supported range" },
@@ -294,13 +199,17 @@ export async function POST(request: Request) {
     }
     categoryId = subCategory.categoryId;
   }
+  if (!categoryId) {
+    return Response.json({ error: "A category is required for every product" }, { status: 400 });
+  }
 
   try {
     const product = await prisma.product.create({
       data: {
         name: name.trim(),
+        sku: typeof sku === "string" ? sku.trim() || null : null,
         slug,
-        description,
+        description: description ?? "",
         price,
         discountPrice: discountPrice ?? null,
         stock: computedStock,
@@ -326,7 +235,7 @@ export async function POST(request: Request) {
       error.code === "P2002"
     ) {
       return Response.json(
-        { error: "A product with this slug already exists" },
+        { error: "A product with this slug or SKU already exists" },
         { status: 409 },
       );
     }

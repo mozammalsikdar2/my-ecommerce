@@ -34,9 +34,9 @@ export default function StoreFooter() {
   if (pathname.startsWith("/admin")) return null;
 
   const socialLinks = [
-    ["Facebook", settings.facebookUrl, Globe],
-    ["Instagram", settings.instagramUrl, Camera],
-    ["YouTube", settings.youtubeUrl, Play],
+    ["Facebook", settings.facebookUrl, settings.footerFacebookIconUrl, Globe],
+    ["Instagram", settings.instagramUrl, settings.footerInstagramIconUrl, Camera],
+    ["YouTube", settings.youtubeUrl, settings.footerYoutubeIconUrl, Play],
   ] as const;
   const whatsappDigits = settings.whatsappNumber.replace(/\D/g, "");
   const messengerUsername = settings.messengerUsername.trim();
@@ -76,7 +76,7 @@ export default function StoreFooter() {
           </p>
 
           <div className="mt-5 flex items-center gap-2.5">
-            {socialLinks.map(([name, value, Icon]) => {
+            {socialLinks.map(([name, value, iconUrl, Icon]) => {
               const href = safeExternalUrl(value);
               if (!href) return null;
               return (
@@ -88,7 +88,11 @@ export default function StoreFooter() {
                   aria-label={name}
                   className="rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
                 >
-                  <Icon className="h-4 w-4" />
+                  {iconUrl ? (
+                    <Image src={iconUrl} alt="" width={16} height={16} unoptimized className="h-4 w-4 object-contain" />
+                  ) : (
+                    <Icon className="h-4 w-4" aria-hidden="true" />
+                  )}
                 </a>
               );
             })}

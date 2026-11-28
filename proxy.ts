@@ -25,7 +25,7 @@ export async function proxy(request: NextRequest) {
     pathname === "/account" || pathname.startsWith("/account/");
 
   if (isLoginPage) {
-    if (isStaff) {
+    if (isStaff && request.nextUrl.searchParams.get("preview") !== "1") {
       return NextResponse.redirect(new URL("/admin", request.url));
     }
     const response = NextResponse.next();

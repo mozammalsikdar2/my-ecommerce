@@ -545,7 +545,18 @@ export default function AdminCategoriesPage() {
                         {category.imageUrl ? " · image set" : ""}
                       </p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
+                      <Link
+                        href={`/admin/products?categoryId=${encodeURIComponent(category.id)}`}
+                        aria-label={`Add item to ${category.name}`}
+                        style={{
+                          backgroundColor: `${settings.primaryColor}15`,
+                          color: settings.primaryColor,
+                        }}
+                        className="rounded-lg px-2.5 py-1 text-[11px] font-extrabold hover:opacity-80"
+                      >
+                        + Add Item
+                      </Link>
                       <button
                         type="button"
                         onClick={() =>

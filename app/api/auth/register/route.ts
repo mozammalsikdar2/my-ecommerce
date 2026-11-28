@@ -8,6 +8,8 @@ import { createAuthSession } from "@/lib/auth-session";
 import { prisma } from "@/lib/prisma";
 import { publicUserSelect } from "@/lib/user-auth";
 
+class RegistrationDisabledError extends Error {}
+
 const registerSchema = z.object({
   name: z
     .string()
@@ -73,6 +75,13 @@ export async function POST(request: Request) {
   try {
     const user = await prisma.$transaction(
       async (transaction) => {
+        const settings = await transaction.siteSettings.findUnique({
+          where: { id: 1 },
+          select: { userRegistrationEnabled: true },
+        });
+        if (settings?.userRegistrationEnabled === false) {
+          throw new RegistrationDisabledError();
+        }
         const existingUsers = await transaction.user.count();
         return transaction.user.create({
           data: {
@@ -117,6 +126,12 @@ export async function POST(request: Request) {
     setAuthCookies(response, tokens, "user");
     return response;
   } catch (error) {
+    if (error instanceof RegistrationDisabledError) {
+      return Response.json(
+        { error: "Customer registration is currently disabled" },
+        { status: 403 },
+      );
+    }
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"

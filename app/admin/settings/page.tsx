@@ -22,6 +22,7 @@ import {
   ExternalLink,
   Image as ImageIcon,
   LayoutTemplate,
+  LockKeyhole,
   Menu as MenuIcon,
   Palette,
   Plus,
@@ -33,6 +34,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import HeaderSettingsPanel from "@/components/HeaderSettingsPanel";
 
 const settingsTabs = [
   { id: "brand", label: "Brand & Theme", icon: Palette },
@@ -41,10 +43,55 @@ const settingsTabs = [
   { id: "flash-sale", label: "Flash Sale", icon: Timer },
   { id: "delivery", label: "Delivery & Contact", icon: Truck },
   { id: "footer", label: "Footer & Social", icon: ExternalLink },
+  { id: "header", label: "Header & Icons", icon: MenuIcon },
+  { id: "login", label: "Login Panels", icon: LockKeyhole },
   { id: "banners", label: "Slider Banners", icon: ImageIcon },
 ] as const;
 
 type SettingsTab = (typeof settingsTabs)[number]["id"];
+
+const loginTextGroups = [
+  {
+    title: "Admin login",
+    fields: [
+      ["adminLoginBackText", "Back link"],
+      ["adminLoginBadgeText", "Security badge"],
+      ["adminLoginEyebrow", "Eyebrow"],
+      ["adminLoginTitle", "Title"],
+      ["adminLoginSubtitle", "Subtitle"],
+      ["adminEmailLabel", "Email label"],
+      ["adminEmailPlaceholder", "Email placeholder"],
+      ["adminPasswordLabel", "Password label"],
+      ["adminForgotText", "Forgot password link"],
+      ["adminButtonText", "Sign-in button"],
+      ["adminSwitchPrompt", "Customer login prompt"],
+      ["adminSwitchLinkText", "Customer login link"],
+    ],
+  },
+  {
+    title: "Customer login",
+    fields: [
+      ["userLoginBackText", "Back link"],
+      ["userLoginBadgeText", "Security badge"],
+      ["userLoginEyebrow", "Eyebrow"],
+      ["userLoginTitle", "Login title"],
+      ["userLoginSubtitle", "Login subtitle"],
+      ["userRegisterTitle", "Registration title"],
+      ["userRegisterSubtitle", "Registration subtitle"],
+      ["userEmailLabel", "Email label"],
+      ["userEmailPlaceholder", "Email placeholder"],
+      ["userPasswordLabel", "Password label"],
+      ["userForgotText", "Forgot password link"],
+      ["userButtonText", "Sign-in button"],
+      ["userRegisterButtonText", "Registration button"],
+      ["userSwitchPrompt", "Admin login prompt"],
+      ["userSwitchLinkText", "Admin login link"],
+    ],
+  },
+] as const satisfies readonly {
+  title: string;
+  fields: readonly (readonly [keyof SiteSettings, string])[];
+}[];
 
 function toLocalDateTime(value: string | null) {
   if (!value) return "";
@@ -285,7 +332,7 @@ export default function AdminSettingsPage() {
     const { name, value, type } = event.target;
     setFormOverrides((previous) => ({
       ...previous,
-      [name]: type === "number" ? Number(value) : value,
+      [name]: type === "number" || type === "range" ? Number(value) : value,
     }));
   };
 
@@ -598,6 +645,185 @@ export default function AdminSettingsPage() {
           hidden={activeTab === "banners"}
           className="space-y-6 rounded-xl border bg-white p-6 shadow-sm disabled:opacity-70"
         >
+        <div
+          id="settings-panel-header"
+          role="tabpanel"
+          aria-labelledby="settings-tab-header"
+          tabIndex={0}
+          hidden={activeTab !== "header"}
+        >
+          {activeTab === "header" && (
+            <HeaderSettingsPanel
+              formData={formData}
+              setFormOverrides={setFormOverrides}
+              handleChange={handleChange}
+              handleFileUpload={handleFileUpload}
+              uploadingField={uploadingField}
+            />
+          )}
+        </div>
+        <div
+          id="settings-panel-login"
+          role="tabpanel"
+          aria-labelledby="settings-tab-login"
+          tabIndex={0}
+          hidden={activeTab !== "login"}
+        >
+          <h2 className="mb-4 border-b pb-2 text-lg font-semibold">
+            Login Panel Customization
+          </h2>
+          <div className="mb-5 flex flex-wrap items-center gap-3">
+            <Link
+              href="/admin/login?preview=1"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold hover:bg-gray-50"
+            >
+              Preview Admin Login <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />
+            </Link>
+            <Link
+              href="/login"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold hover:bg-gray-50"
+            >
+              Preview Customer Login <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />
+            </Link>
+            <span className="text-xs text-gray-500">Previews show saved settings.</span>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="text-xs font-bold text-gray-700">
+              Background image URL (leave blank for the default design)
+              <input
+                type="text"
+                name="loginBgImageUrl"
+                value={formData.loginBgImageUrl}
+                onChange={handleChange}
+                maxLength={2048}
+                className="mt-1 w-full rounded-lg border p-2.5 text-sm"
+              />
+            </label>
+            <label className="text-xs font-bold text-gray-700">
+              Upload background image
+              <input
+                type="file"
+                accept="image/*"
+                disabled={uploadingField !== null}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (file) {
+                    void handleFileUpload(file, "loginBgImageUrl", (url) =>
+                      setFormOverrides((previous) => ({
+                        ...previous,
+                        loginBgImageUrl: url,
+                      })),
+                    );
+                  }
+                }}
+                className="mt-1 block w-full text-sm"
+              />
+              {uploadingField === "loginBgImageUrl" && "Uploading..."}
+            </label>
+            {formData.loginBgImageUrl && (
+              <button
+                type="button"
+                onClick={() =>
+                  setFormOverrides((previous) => ({
+                    ...previous,
+                    loginBgImageUrl: "",
+                  }))
+                }
+                className="w-fit rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50"
+              >
+                Reset background to default
+              </button>
+            )}
+            {(["loginGoldColor", "loginEmeraldColor"] as const).map((field) => (
+              <div key={field}>
+                <label htmlFor={`${field}-picker`} className="text-xs font-bold text-gray-700">
+                  {field === "loginGoldColor" ? "Gold color" : "Emerald color"}
+                </label>
+                <div className="mt-1 flex items-center gap-2">
+                  <input
+                    id={`${field}-picker`}
+                    type="color"
+                    name={field}
+                    value={formData[field]}
+                    onChange={handleChange}
+                    className="h-10 w-12 rounded-lg border"
+                  />
+                  <input
+                    aria-label={field === "loginGoldColor" ? "Gold color hex" : "Emerald color hex"}
+                    type="text"
+                    name={field}
+                    required
+                    pattern="#[0-9a-fA-F]{6}"
+                    maxLength={7}
+                    value={formData[field]}
+                    onChange={handleChange}
+                    className="w-full rounded-lg border p-2.5 font-mono text-sm"
+                  />
+                </div>
+              </div>
+            ))}
+            <label className="text-xs font-bold text-gray-700">
+              Card darkness ({formData.loginCardOpacity}%)
+              <input
+                type="range"
+                name="loginCardOpacity"
+                min={30}
+                max={90}
+                required
+                value={formData.loginCardOpacity}
+                onChange={handleChange}
+                className="mt-1 block w-full rounded-lg border p-2.5 text-sm"
+              />
+            </label>
+          </div>
+          {loginTextGroups.map((group) => (
+            <section key={group.title} className="mt-6">
+              <h3 className="mb-3 text-sm font-bold">{group.title}</h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {group.fields.map(([field, label]) => (
+                  <label key={field} className="text-xs font-bold text-gray-700">
+                    {label}
+                    <input
+                      type="text"
+                      name={field}
+                      required
+                      maxLength={500}
+                      value={formData[field]}
+                      onChange={handleChange}
+                      className="mt-1 block w-full rounded-lg border p-2.5 text-sm"
+                    />
+                  </label>
+                ))}
+              </div>
+            </section>
+          ))}
+          <div className="mt-6 space-y-3">
+            {([
+              ["showAdminUserSwitchLink", "Show customer login link on admin login"],
+              ["showUserAdminSwitchLink", "Show admin login link on customer login"],
+              ["userRegistrationEnabled", "Allow customer registration"],
+            ] as const).map(([field, label]) => (
+              <label key={field} className="flex items-center gap-2 text-sm font-semibold">
+                <input
+                  type="checkbox"
+                  checked={formData[field]}
+                  onChange={(event) =>
+                    setFormOverrides((previous) => ({
+                      ...previous,
+                      [field]: event.target.checked,
+                    }))
+                  }
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+        </div>
         <div
           id="settings-panel-brand"
           role="tabpanel"
@@ -1292,7 +1518,7 @@ export default function AdminSettingsPage() {
                 name="messengerUsername"
                 value={formData.messengerUsername}
                 onChange={handleChange}
-                placeholder="Facebook Page username or ID"
+                placeholder="e.g., alifstorebd"
                 className="mt-1 w-full rounded-lg border p-2.5 text-sm"
               />
               <p className="mt-1 text-xs text-gray-500">

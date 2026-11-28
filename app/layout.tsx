@@ -8,6 +8,7 @@ import MetaPixel from "@/components/MetaPixel";
 import StorefrontShell from "@/components/StorefrontShell";
 import { AuthProvider } from "@/context/AuthContext";
 import { CartProvider } from "@/context/CartContext";
+import { LanguageProvider } from "@/context/LanguageContext";
 import { SettingsProvider } from "@/context/SettingsContext";
 import { WishlistProvider } from "@/context/WishlistContext";
 import { getMarketingSettings } from "@/lib/marketing-settings";
@@ -102,20 +103,22 @@ async function StorefrontProviders({
   const initialSettings = (await getSettingsForRequest()) ?? undefined;
 
   return (
-    <AuthProvider>
-      <WishlistProvider>
-        <CartProvider>
-          <SettingsProvider initialSettings={initialSettings}>
-            <Suspense fallback={null}>
-              <MetaPixel />
-            </Suspense>
-            <Suspense fallback={null}>
-              <StorefrontShell>{children}</StorefrontShell>
-            </Suspense>
-          </SettingsProvider>
-        </CartProvider>
-      </WishlistProvider>
-    </AuthProvider>
+    <SettingsProvider initialSettings={initialSettings}>
+      <LanguageProvider>
+        <AuthProvider>
+          <CartProvider>
+            <WishlistProvider>
+              <Suspense fallback={null}>
+                <MetaPixel />
+              </Suspense>
+              <Suspense fallback={null}>
+                <StorefrontShell>{children}</StorefrontShell>
+              </Suspense>
+            </WishlistProvider>
+          </CartProvider>
+        </AuthProvider>
+      </LanguageProvider>
+    </SettingsProvider>
   );
 }
 

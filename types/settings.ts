@@ -1,9 +1,12 @@
+import { defaultLoginSettings, type LoginSettings } from "@/types/login-settings";
+import { defaultHeaderSettings, type HeaderSettings } from "@/types/header-settings";
+
 export interface MenuItem {
   label: string;
   href: string;
 }
 
-export interface SiteSettings {
+export interface SiteSettings extends LoginSettings, HeaderSettings {
   storeName: string;
   tagline: string;
   logoUrl: string;
@@ -39,6 +42,8 @@ export const defaultMenuItems: MenuItem[] = [
 ];
 
 export const defaultSettings: SiteSettings = {
+  ...defaultLoginSettings,
+  ...defaultHeaderSettings,
   storeName: "ALIF STORE",
   tagline: "Premium Quality & Trusted Online Shopping",
   logoUrl: "",
@@ -47,8 +52,7 @@ export const defaultSettings: SiteSettings = {
   secondaryColor: "#111827",
   fontFamily: "Inter",
   menuItems: defaultMenuItems,
-  announcementText:
-    "Free Delivery on orders over 2,000 BDT! Cash on Delivery Available.",
+  announcementText: "সারা বাংলাদেশে ক্যাশ অন ডেলিভারি",
   heroTitle: "Discover Exclusive Collections for Everyday Life",
   heroSubtitle:
     "Shop top-rated products with fast nationwide delivery and 100% authentic guarantee.",

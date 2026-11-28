@@ -1,6 +1,8 @@
 import { defaultMenuItems } from "@/types/settings";
 import type { MenuItem, SiteSettings } from "@/types/settings";
 import { prisma } from "@/lib/prisma";
+import { loginSettingsSchema } from "@/types/login-settings";
+import { headerSettingsSchema } from "@/types/header-settings";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -53,6 +55,8 @@ export async function getSiteSettings(): Promise<SiteSettings> {
   });
 
   return {
+    ...loginSettingsSchema.parse(record),
+    ...headerSettingsSchema.parse(record),
     storeName: record.storeName,
     tagline: record.tagline,
     logoUrl: record.logoUrl,

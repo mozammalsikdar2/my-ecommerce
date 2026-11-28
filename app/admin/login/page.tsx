@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
+import LuxuryAuthShell from "@/components/LuxuryAuthShell";
 import {
   ArrowLeft,
   ArrowRight,
@@ -12,7 +13,6 @@ import {
   EyeOff,
   Lock,
   Mail,
-  ShieldCheck,
 } from "lucide-react";
 
 function AdminLoginForm() {
@@ -34,6 +34,7 @@ function AdminLoginForm() {
   );
   const [otp, setOtp] = useState("");
   const requestedPath = searchParams.get("redirect");
+  const isDesignPreview = searchParams.get("preview") === "1";
   const destination =
     requestedPath?.startsWith("/admin/") &&
     requestedPath !== "/admin/login" &&
@@ -44,11 +45,12 @@ function AdminLoginForm() {
   useEffect(() => {
     if (
       !loading &&
+      !isDesignPreview &&
       (user?.role === "ADMIN" || user?.role === "MODERATOR")
     ) {
       router.replace("/admin");
     }
-  }, [loading, router, user]);
+  }, [isDesignPreview, loading, router, user]);
 
   const finishAdminLogin = async (result: unknown) => {
     const user =
@@ -187,174 +189,128 @@ function AdminLoginForm() {
   };
 
   return (
-    <div className="flex min-h-[85vh] items-center justify-center bg-gray-950 px-4 py-12">
+    <LuxuryAuthShell
+      backText={settings.adminLoginBackText}
+      badgeText={settings.adminLoginBadgeText}
+    >
+      <div className="text-center">
+        <div
+          style={{ color: settings.loginGoldColor }}
+          className="text-[10px] font-bold uppercase tracking-[0.22em]"
+        >
+          {challengeToken ? "Two-Factor Verification" : settings.adminLoginEyebrow}
+        </div>
+        <h1 className="mt-1.5 text-2xl font-extrabold tracking-tight text-white">
+          {challengeToken ? "Enter Security Code" : settings.adminLoginTitle}
+        </h1>
+        <p className="mx-auto mt-2 max-w-[330px] text-xs leading-relaxed text-gray-300">
+          {challengeToken
+            ? `Enter the 6-digit verification code sent via ${challengeChannel} to ${maskedDestination}.`
+            : settings.adminLoginSubtitle}
+        </p>
+      </div>
+
+      {error && (
+        <p
+          role="alert"
+          className="mt-4 rounded-lg border border-red-400/40 bg-red-950/60 px-3.5 py-2.5 text-xs font-medium text-red-200"
+        >
+          {error}
+        </p>
+      )}
+
       <form
         onSubmit={challengeToken ? handleVerify2fa : handleAdminLogin}
-        className="w-full max-w-md rounded-2xl border border-gray-800 bg-gray-900 p-8 text-white shadow-2xl"
+        className="mt-5 space-y-4"
       >
-        <Link
-          href="/"
-          className="mb-6 inline-flex items-center gap-1.5 text-xs font-semibold text-gray-400 transition hover:text-white"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          <span>Back to {settings.storeName}</span>
-        </Link>
-
-        <div className="flex items-center gap-3">
-          <div
-            style={{ backgroundColor: settings.primaryColor }}
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white shadow-lg"
-          >
-            <ShieldCheck className="h-6 w-6" />
-          </div>
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-widest text-gray-400">
-              Restricted Access
-            </span>
-            <h1 className="text-xl font-extrabold text-white">
-              Admin Login Dashboard
-            </h1>
-          </div>
-        </div>
-
-        <p className="mt-3 text-xs text-gray-400">
-          {challengeToken
-            ? `Enter the verification code sent by ${challengeChannel === "SMS" ? "SMS" : "email"} to ${maskedDestination}.`
-            : "Sign in with your Administrator or Moderator credentials to manage products, orders, payments, and site settings."}
-        </p>
-
-        {error && (
-          <p
-            role="alert"
-            className="mt-5 rounded-xl border border-red-500/40 bg-red-950/60 p-3.5 text-xs font-semibold text-red-300"
-          >
-            {error}
-          </p>
-        )}
-
-        <div className="mt-6 space-y-4">
           {!challengeToken ? (
             <>
-          <div>
-            <label
-              htmlFor="admin-email"
-              className="block text-xs font-bold text-gray-300"
-            >
-              Admin Email Address *
-            </label>
-            <div className="relative mt-1">
-              <Mail className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
-              <input
-                id="admin-email"
-                type="email"
-                autoComplete="username"
-                maxLength={254}
-                required
-                placeholder="admin@example.com"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                className="w-full rounded-xl border border-gray-700 bg-gray-800 py-2.5 pl-9 pr-3 text-sm text-white placeholder-gray-500 focus:border-gray-500 focus:outline-none"
-              />
-            </div>
-          </div>
+              <div>
+                <label htmlFor="admin-email" className="block text-xs font-medium text-gray-200">
+                  {settings.adminEmailLabel} <span className="text-amber-400">*</span>
+                </label>
+                <div className="relative mt-1.5">
+                  <Mail aria-hidden="true" className="pointer-events-none absolute left-3.5 top-3 h-4 w-4 text-gray-400" />
+                  <input
+                    id="admin-email"
+                    type="email"
+                    autoComplete="username"
+                    maxLength={254}
+                    required
+                    placeholder={settings.adminEmailPlaceholder}
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    className="w-full rounded-lg border border-white/15 bg-black/35 py-2.5 pl-10 pr-3 text-sm text-white placeholder-gray-400 transition focus:border-amber-400/70 focus:bg-black/50 focus:outline-none"
+                  />
+                </div>
+              </div>
 
-          <div>
-            <label
-              htmlFor="admin-password"
-              className="block text-xs font-bold text-gray-300"
-            >
-              Password *
-            </label>
-            <div className="relative mt-1">
-              <Lock className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
-              <input
-                id="admin-password"
-                type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                className="w-full rounded-xl border border-gray-700 bg-gray-800 py-2.5 pl-9 pr-10 text-sm text-white placeholder-gray-500 focus:border-gray-500 focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((current) => !current)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                className="absolute right-3 top-2.5 text-gray-400 hover:text-white"
-              >
-                {showPassword ? (
-                  <EyeOff className="h-4 w-4" />
-                ) : (
-                  <Eye className="h-4 w-4" />
-                )}
-              </button>
-            </div>
-
-            <div className="mt-2 flex justify-end">
-              <Link
-                href="/forgot-password"
-                className="text-xs font-bold text-amber-400 hover:underline"
-              >
-                Forgot Password?
-              </Link>
-            </div>
-          </div>
+              <div>
+                <label htmlFor="admin-password" className="block text-xs font-medium text-gray-200">
+                  {settings.adminPasswordLabel} <span className="text-amber-400">*</span>
+                </label>
+                <div className="relative mt-1.5">
+                  <Lock aria-hidden="true" className="pointer-events-none absolute left-3.5 top-3 h-4 w-4 text-gray-400" />
+                  <input
+                    id="admin-password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    required
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    className="w-full rounded-lg border border-white/15 bg-black/35 py-2.5 pl-10 pr-10 text-sm text-white placeholder-gray-400 transition focus:border-amber-400/70 focus:bg-black/50 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((current) => !current)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    className="absolute right-3.5 top-3 text-gray-400 hover:text-white"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                <div className="mt-2 flex justify-end">
+                  <Link
+                    href="/forgot-password"
+                    style={{ color: settings.loginGoldColor }}
+                    className="text-xs font-medium opacity-90 hover:underline hover:opacity-100"
+                  >
+                    {settings.adminForgotText}
+                  </Link>
+                </div>
+              </div>
             </>
           ) : (
-            <>
-              <div>
-                <label
-                  htmlFor="admin-otp"
-                  className="block text-xs font-bold text-gray-300"
-                >
-                  Six-digit verification code
-                </label>
-                <input
-                  id="admin-otp"
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  pattern="[0-9]{6}"
-                  maxLength={6}
-                  required
-                  value={otp}
-                  onChange={(event) =>
-                    setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))
-                  }
-                  className="mt-1 w-full rounded-xl border border-gray-700 bg-gray-800 px-3 py-2.5 text-center text-lg tracking-[0.4em] text-white focus:border-gray-500 focus:outline-none"
-                />
-              </div>
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={handleResendCode}
-                className="text-xs font-semibold text-amber-400 hover:underline disabled:opacity-50"
-              >
-                Resend code
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setChallengeToken(null);
-                  setChallengeChannel(null);
-                  setMaskedDestination(null);
-                  setPassword("");
-                  setOtp("");
-                  setError(null);
-                }}
-                disabled={isSubmitting}
-                className="text-xs font-semibold text-gray-400 hover:text-white disabled:opacity-50"
-              >
-                Back to admin sign in
-              </button>
-            </>
+            <div>
+              <label htmlFor="admin-otp" className="block text-xs font-medium text-gray-200">
+                6-Digit Security Code <span className="text-amber-400">*</span>
+              </label>
+              <input
+                id="admin-otp"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                required
+                placeholder="000000"
+                value={otp}
+                onChange={(event) =>
+                  setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))
+                }
+                className="mt-1.5 w-full rounded-lg border border-white/20 bg-black/45 p-3 text-center font-mono text-2xl font-extrabold tracking-[0.4em] text-white focus:border-amber-400 focus:outline-none"
+              />
+            </div>
           )}
 
           <button
             type="submit"
-            disabled={isSubmitting}
-            style={{ backgroundColor: settings.primaryColor }}
-            className="flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold text-white shadow-lg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={isSubmitting || (challengeToken !== null && otp.length !== 6)}
+            style={{
+              background: `linear-gradient(90deg, ${settings.loginGoldColor} 0%, ${settings.loginGoldColor} 42%, ${settings.loginEmeraldColor} 100%)`,
+            }}
+            className="flex w-full items-center justify-center gap-2 rounded-lg py-3 text-sm font-extrabold text-gray-950 shadow-[0_8px_25px_rgba(229,184,66,0.28)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <span>
               {isSubmitting
@@ -362,21 +318,50 @@ function AdminLoginForm() {
                   ? "Verifying..."
                   : "Authenticating..."
                 : challengeToken
-                  ? "Verify and Sign In"
-                  : "Access Admin Dashboard"}
+                  ? "Verify & Open Admin Dashboard"
+                  : settings.adminButtonText}
             </span>
             <ArrowRight className="h-4 w-4" />
           </button>
-        </div>
 
-        <div className="mt-6 border-t border-gray-800 pt-4 text-center text-xs text-gray-500">
-          Shopping as a customer?{" "}
-          <Link href="/login" className="font-bold text-gray-300 hover:underline">
-            Go to User Login
-          </Link>
-        </div>
+        {challengeToken ? (
+          <div className="flex items-center justify-between pt-1 text-xs">
+            <button
+              type="button"
+              onClick={() => {
+                setChallengeToken(null);
+                setChallengeChannel(null);
+                setMaskedDestination(null);
+                setPassword("");
+                setOtp("");
+                setError(null);
+              }}
+              disabled={isSubmitting}
+              className="inline-flex items-center gap-1 text-gray-300 hover:text-white disabled:opacity-50"
+            >
+              <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5" />
+              <span>Back to admin sign in</span>
+            </button>
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={handleResendCode}
+              style={{ color: settings.loginGoldColor }}
+              className="font-semibold hover:underline disabled:opacity-50"
+            >
+              Resend Code
+            </button>
+          </div>
+        ) : settings.showAdminUserSwitchLink && (
+          <div className="pt-2 text-center text-xs text-gray-300">
+            {settings.adminSwitchPrompt}{" "}
+            <Link href="/login" className="font-semibold text-white underline-offset-4 hover:underline">
+              {settings.adminSwitchLinkText}
+            </Link>
+          </div>
+        )}
       </form>
-    </div>
+    </LuxuryAuthShell>
   );
 }
 
@@ -384,7 +369,7 @@ export default function AdminLoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-[85vh] items-center justify-center bg-gray-950 text-sm text-gray-400">
+        <div className="flex min-h-screen items-center justify-center bg-[#061014] text-xs text-gray-300">
           Loading Admin Portal...
         </div>
       }

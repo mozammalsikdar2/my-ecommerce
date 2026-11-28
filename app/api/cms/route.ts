@@ -6,6 +6,8 @@ import { isHttpUrl } from "@/lib/api-utils";
 import { DEFAULT_HOMEPAGE_SECTIONS } from "@/lib/cms-defaults";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth-guard";
+import { loginSettingsSchema } from "@/types/login-settings";
+import { headerSettingsSchema } from "@/types/header-settings";
 
 const isRootRelativeUrl = (value: string) =>
   value.startsWith("/") && !value.startsWith("//") && !value.includes("\\");
@@ -30,6 +32,8 @@ const storeLink = z
 
 const settingsSchema = z
   .object({
+    ...loginSettingsSchema.shape,
+    ...headerSettingsSchema.shape,
     storeName: z.string().trim().min(1).max(100),
     tagline: z.string().trim().min(1).max(250),
     logoUrl: emptyOrImageLocation,
@@ -230,7 +234,7 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-  const { errorResponse } = await requireRole(
+  const { user, errorResponse } = await requireRole(
     ["ADMIN", "MODERATOR"],
     request,
   );
@@ -255,6 +259,14 @@ export async function PUT(request: Request) {
   }
 
   const { settings, banners, sections } = parsed.data;
+  if (
+    user?.role !== "ADMIN" &&
+    settings &&
+    [...Object.keys(loginSettingsSchema.shape), ...Object.keys(headerSettingsSchema.shape)]
+      .some((key) => key in settings)
+  ) {
+    return NextResponse.json({ error: "Admin access required" }, { status: 403 });
+  }
 
   try {
     const result = await prisma.$transaction(async (transaction) => {

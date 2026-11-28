@@ -65,7 +65,9 @@ function ProductCatalogContent() {
   const [categoryId, setCategoryId] = useState(
     searchParams.get("categoryId") || "ALL"
   );
-  const [subCategoryId, setSubCategoryId] = useState("");
+  const [subCategoryId, setSubCategoryId] = useState(
+    searchParams.get("subCategoryId") || "",
+  );
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [inStockOnly, setInStockOnly] = useState(false);
@@ -573,6 +575,11 @@ function ProductCatalogContent() {
   );
 }
 
+function ProductCatalogWithQuery() {
+  const searchParams = useSearchParams();
+  return <ProductCatalogContent key={searchParams.toString()} />;
+}
+
 export default function ProductsPage() {
   return (
     <Suspense
@@ -582,7 +589,7 @@ export default function ProductsPage() {
         </div>
       }
     >
-      <ProductCatalogContent />
+      <ProductCatalogWithQuery />
     </Suspense>
   );
 }

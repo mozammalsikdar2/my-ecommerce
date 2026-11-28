@@ -1,20 +1,24 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   FolderTree,
   Layers,
   Package,
+  Pencil,
   Plus,
   Search,
+  Save,
   Trash2,
   Upload,
   X,
 } from "lucide-react";
 import { useSettings } from "@/context/SettingsContext";
+import AdminProductEditor from "@/components/AdminProductEditor";
 
 interface SubCategory {
   id: string;
@@ -47,6 +51,10 @@ interface ProductVariant {
 interface ProductRecord {
   id: string;
   name: string;
+  sku: string | null;
+  description: string;
+  categoryId: string;
+  subCategoryId: string | null;
   price: number;
   discountPrice: number | null;
   stock: number;
@@ -62,6 +70,7 @@ interface ProductRecord {
 
 interface ProductForm {
   name: string;
+  sku: string;
   description: string;
   price: string;
   discountPrice: string;
@@ -76,10 +85,11 @@ interface ProductForm {
 
 const initialProductForm: ProductForm = {
   name: "",
+  sku: "",
   description: "",
   price: "",
   discountPrice: "",
-  stock: "10",
+  stock: "25",
   image: "",
   extraImages: "",
   categoryId: "",
@@ -129,6 +139,10 @@ function isProduct(value: unknown): value is ProductRecord {
     isRecord(value) &&
     typeof value.id === "string" &&
     typeof value.name === "string" &&
+    (typeof value.sku === "string" || value.sku === null) &&
+    typeof value.description === "string" &&
+    typeof value.categoryId === "string" &&
+    (typeof value.subCategoryId === "string" || value.subCategoryId === null) &&
     typeof value.price === "number" &&
     (typeof value.discountPrice === "number" || value.discountPrice === null) &&
     typeof value.stock === "number" &&
@@ -163,7 +177,7 @@ async function getApiError(response: Response) {
 async function fetchAdminData(signal?: AbortSignal) {
   const [categoryResponse, productResponse] = await Promise.all([
     fetch("/api/categories", { cache: "no-store", signal }),
-    fetch("/api/products?includeInactive=true", {
+    fetch("/api/admin/products", {
       cache: "no-store",
       signal,
     }),
@@ -192,6 +206,20 @@ async function fetchAdminData(signal?: AbortSignal) {
 }
 
 export default function AdminProductsPage() {
+  return (
+    <Suspense fallback={<div className="px-4 py-10">Loading product manager...</div>}>
+      <ProductManagerWithCategory />
+    </Suspense>
+  );
+}
+
+function ProductManagerWithCategory() {
+  const searchParams = useSearchParams();
+  const categoryId = searchParams.get("categoryId") || "";
+  return <ProductManager key={categoryId} initialCategoryId={categoryId} />;
+}
+
+function ProductManager({ initialCategoryId }: { initialCategoryId: string }) {
   const { settings } = useSettings();
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<ProductRecord[]>([]);
@@ -210,6 +238,11 @@ export default function AdminProductsPage() {
   const [variants, setVariants] = useState<VariantInput[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState(initialCategoryId || "ALL");
+  const [editedRows, setEditedRows] = useState<Record<string, Partial<Record<"name" | "price" | "discountPrice" | "stock", string>>>>({});
+  const [savingRows, setSavingRows] = useState(false);
+  const [bulkPercent, setBulkPercent] = useState("-10");
+  const [editingProduct, setEditingProduct] = useState<ProductRecord | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -220,7 +253,19 @@ export default function AdminProductsPage() {
         if (controller.signal.aborted) return;
         setCategories(data.categories);
         setProducts(data.products);
-        setError(null);
+        if (initialCategoryId && !data.categories.some((category) => category.id === initialCategoryId)) {
+          setError("The selected category could not be found. Please choose another category.");
+          setSelectedCategory("ALL");
+        } else {
+          if (initialCategoryId) {
+            setProductForm((current) => ({
+              ...current,
+              categoryId: initialCategoryId,
+              subCategoryId: "",
+            }));
+          }
+          setError(null);
+        }
       } catch (loadError) {
         if (!controller.signal.aborted) {
           setError(
@@ -236,7 +281,7 @@ export default function AdminProductsPage() {
 
     void loadInitialData();
     return () => controller.abort();
-  }, []);
+  }, [initialCategoryId]);
 
   const refreshData = async () => {
     const data = await fetchAdminData();
@@ -310,7 +355,7 @@ export default function AdminProductsPage() {
   const handleDeleteCategory = async (id: string, isSubCategory = false) => {
     const prompt = isSubCategory
       ? "Delete this subcategory? Products will remain in the main category."
-      : "Delete this category and its subcategories? Products will become uncategorized.";
+      : "Delete this empty category and its subcategories? Categories containing products cannot be deleted.";
     if (!window.confirm(prompt)) return;
 
     const itemKey = `category:${id}`;
@@ -451,11 +496,12 @@ export default function AdminProductsPage() {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch("/api/products", {
+      const response = await fetch("/api/admin/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: productForm.name,
+          sku: productForm.sku.trim() || null,
           description: productForm.description,
           price: Number(productForm.price),
           discountPrice: productForm.discountPrice
@@ -497,7 +543,7 @@ export default function AdminProductsPage() {
     setMessage(null);
     try {
       const response = await fetch(
-        `/api/products/${encodeURIComponent(product.id)}`,
+        `/api/admin/products/${encodeURIComponent(product.id)}`,
         { method: "DELETE" },
       );
       if (!response.ok) throw new Error(await getApiError(response));
@@ -613,16 +659,123 @@ export default function AdminProductsPage() {
     }
   };
 
+  const editRow = (
+    product: ProductRecord,
+    field: "name" | "price" | "discountPrice" | "stock",
+    value: string,
+  ) => {
+    const original = field === "discountPrice"
+      ? product.discountPrice === null ? "" : String(product.discountPrice)
+      : String(product[field]);
+    setEditedRows((current) => {
+      const next = { ...current };
+      const row = { ...next[product.id] };
+      if (value === original) delete row[field];
+      else row[field] = value;
+      if (Object.keys(row).length) next[product.id] = row;
+      else delete next[product.id];
+      return next;
+    });
+  };
+
+  const saveEditedRows = async (id?: string) => {
+    const rows = Object.entries(editedRows)
+      .filter(([productId]) => !id || productId === id)
+      .map(([productId, fields]) => ({ id: productId, ...fields }));
+    if (!rows.length) return;
+    if (rows.length > 100) {
+      setError("Save at most 100 modified rows at a time, or save individual rows.");
+      return;
+    }
+    if (rows.some((row) => row.price !== undefined &&
+      (!row.price.trim() || !Number.isFinite(Number(row.price)) || Number(row.price) < 1))) {
+      setError("Inline regular prices must be at least 1.");
+      return;
+    }
+    setSavingRows(true);
+    setError(null);
+    setMessage(null);
+    let saved = false;
+    try {
+      const response = await fetch(
+        id ? `/api/admin/products/${encodeURIComponent(id)}` : "/api/admin/products/bulk",
+        {
+          method: id ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(id
+            ? editedRows[id]
+            : { action: "SAVE_ROWS", rows }),
+        },
+      );
+      if (!response.ok) throw new Error(await getApiError(response));
+      saved = true;
+      setEditedRows((current) => {
+        const next = { ...current };
+        for (const row of rows) delete next[row.id];
+        return next;
+      });
+      await refreshData();
+      notify(`Saved ${rows.length} product${rows.length === 1 ? "" : "s"}.`);
+    } catch (requestError) {
+      const detail = requestError instanceof Error ? requestError.message : "Request failed";
+      setError(saved ? `Products were saved, but refreshing failed: ${detail}` : detail);
+    } finally {
+      setSavingRows(false);
+    }
+  };
+
+  const applyCategoryPercent = async () => {
+    const percent = Number(bulkPercent);
+    if (selectedCategory === "ALL" || !bulkPercent.trim() || !Number.isFinite(percent) || percent === 0) {
+      setError("Select a category and enter a non-zero percentage.");
+      return;
+    }
+    if (Object.keys(editedRows).length) {
+      setError("Save or discard inline edits before adjusting category prices.");
+      return;
+    }
+    if (!window.confirm(
+      `Adjust all prices in this category by ${percent}%? This includes hidden products, rounds prices to whole units (minimum 10 / 5), and leaves fixed variant prices unchanged.`,
+    )) return;
+    setSavingRows(true);
+    setError(null);
+    setMessage(null);
+    let saved = false;
+    try {
+      const response = await fetch("/api/admin/products/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "CATEGORY_PERCENT", categoryId: selectedCategory, percent }),
+      });
+      if (!response.ok) throw new Error(await getApiError(response));
+      saved = true;
+      const result: unknown = await response.json();
+      if (!isRecord(result) || typeof result.message !== "string" ||
+          typeof result.productsWithFixedPriceVariants !== "number") {
+        throw new Error("Bulk API returned an invalid response");
+      }
+      await refreshData();
+      notify(`${result.message} ${result.productsWithFixedPriceVariants} product(s) have unchanged fixed variant prices.`);
+    } catch (requestError) {
+      const detail = requestError instanceof Error ? requestError.message : "Request failed";
+      setError(saved ? `Prices were adjusted, but the result could not be confirmed: ${detail}` : detail);
+    } finally {
+      setSavingRows(false);
+    }
+  };
+
   const availableSubCategories =
     categories.find((category) => category.id === productForm.categoryId)
       ?.subCategories ?? [];
   const filteredProducts = products.filter((product) => {
     const query = searchQuery.trim().toLocaleLowerCase();
     return (
-      query.length === 0 ||
-      product.name.toLocaleLowerCase().includes(query) ||
-      product.category?.name.toLocaleLowerCase().includes(query) ||
-      product.subCategory?.name.toLocaleLowerCase().includes(query)
+      (selectedCategory === "ALL" || product.categoryId === selectedCategory) &&
+      (query.length === 0 ||
+        product.name.toLocaleLowerCase().includes(query) ||
+        product.sku?.toLocaleLowerCase().includes(query) ||
+        product.category?.name.toLocaleLowerCase().includes(query) ||
+        product.subCategory?.name.toLocaleLowerCase().includes(query))
     );
   });
 
@@ -810,7 +963,7 @@ export default function AdminProductsPage() {
         )}
       </section>
 
-      <section className="rounded-xl border bg-white p-6 shadow-sm">
+      <section id="add-product" className="rounded-xl border bg-white p-6 shadow-sm">
         <div className="mb-4 flex items-center gap-2 border-b pb-3">
           <Package className="h-5 w-5 text-teal-700" />
           <h2 className="text-lg font-bold text-gray-800">
@@ -853,6 +1006,7 @@ export default function AdminProductsPage() {
               </label>
               <select
                 id="product-category"
+                required
                 value={productForm.categoryId}
                 onChange={(event) =>
                   setProductForm((current) => ({
@@ -871,6 +1025,19 @@ export default function AdminProductsPage() {
                 ))}
               </select>
             </div>
+
+            <label className="block text-xs font-semibold text-gray-700">
+              SKU (optional)
+              <input
+                type="text"
+                maxLength={100}
+                value={productForm.sku}
+                onChange={(event) =>
+                  setProductForm((current) => ({ ...current, sku: event.target.value }))
+                }
+                className="mt-1 w-full rounded-lg border p-2.5 text-sm"
+              />
+            </label>
 
             <div>
               <label
@@ -1284,11 +1451,49 @@ export default function AdminProductsPage() {
               type="search"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search products or categories..."
-              aria-label="Search products or categories"
+              placeholder="Search products, SKU or categories..."
+              aria-label="Search products, SKU or categories"
               className="w-full rounded-lg border py-2 pl-9 pr-3 text-sm"
             />
           </label>
+        </div>
+        <div className="flex flex-wrap gap-2 border-b p-4" aria-label="Filter by category">
+          <button type="button" onClick={() => setSelectedCategory("ALL")} aria-pressed={selectedCategory === "ALL"}
+            style={selectedCategory === "ALL" ? { backgroundColor: settings.primaryColor, color: "#fff" } : undefined}
+            className="rounded-lg border px-3 py-2 text-xs font-bold">All Categories</button>
+          {categories.map((category) => (
+            <button key={category.id} type="button" onClick={() => setSelectedCategory(category.id)}
+              aria-pressed={selectedCategory === category.id}
+              style={selectedCategory === category.id ? { backgroundColor: settings.primaryColor, color: "#fff" } : undefined}
+              className="rounded-lg border px-3 py-2 text-xs font-bold">
+              {category.name}{category._count ? ` (${category._count.products})` : ""}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-3 border-b p-4">
+          <a href="#add-product" className="rounded-lg border px-3 py-2 text-xs font-bold">Add New Product</a>
+          {Object.keys(editedRows).length > 0 && (
+            <>
+              <button type="button" disabled={savingRows || Boolean(busyItem)}
+                onClick={() => void saveEditedRows()}
+                className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-bold disabled:opacity-50">
+                Save {Object.keys(editedRows).length} Modified Row(s)
+              </button>
+              <button type="button" disabled={savingRows} onClick={() => {
+                if (window.confirm("Discard all inline edits?")) setEditedRows({});
+              }} className="rounded-lg border px-3 py-2 text-xs font-bold disabled:opacity-50">Discard edits</button>
+            </>
+          )}
+          {selectedCategory !== "ALL" && (
+            <div className="flex items-center gap-2">
+              <label htmlFor="category-percent" className="text-xs font-bold">Bulk category price adjust (%)</label>
+              <input id="category-percent" type="number" step="any" value={bulkPercent}
+                onChange={(event) => setBulkPercent(event.target.value)} className="w-20 rounded border p-2 text-xs" />
+              <button type="button" disabled={savingRows || Boolean(busyItem)}
+                onClick={() => void applyCategoryPercent()}
+                className="rounded-lg bg-gray-900 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Apply</button>
+            </div>
+          )}
         </div>
         <table className="w-full text-left text-sm">
           <thead className="border-b bg-gray-50 text-xs uppercase text-gray-600">
@@ -1330,10 +1535,13 @@ export default function AdminProductsPage() {
                         className="h-12 w-12 rounded-lg border object-cover"
                       />
                       <div>
-                        <p className="font-semibold text-gray-800">
-                          {product.name}
-                        </p>
+                        <input type="text" aria-label={`Name for ${product.name}`}
+                          disabled={savingRows}
+                          value={editedRows[product.id]?.name ?? product.name}
+                          onChange={(event) => editRow(product, "name", event.target.value)}
+                          className="w-48 rounded border px-2 py-1 font-semibold text-gray-800 disabled:opacity-50" />
                         <p className="text-[11px] text-gray-500">
+                          SKU: {product.sku || "—"} ·{" "}
                           {product.images.length} image
                           {product.images.length === 1 ? "" : "s"} ·{" "}
                           {product.isActive ? "Active" : "Hidden"}
@@ -1345,19 +1553,21 @@ export default function AdminProductsPage() {
                     {product.category?.name || "Uncategorized"}
                     {product.subCategory && ` › ${product.subCategory.name}`}
                   </td>
-                  <td className="px-4 py-3 font-bold text-gray-800">
-                    {product.discountPrice !== null ? (
-                      <div>
-                        <span className="text-teal-700">
-                          ৳{product.discountPrice}
-                        </span>{" "}
-                        <span className="text-xs font-normal text-gray-400 line-through">
-                          ৳{product.price}
-                        </span>
-                      </div>
-                    ) : (
-                      `৳${product.price}`
-                    )}
+                  <td className="px-4 py-3">
+                    <label className="block text-xs text-gray-500">Regular
+                      <input type="number" min="1" step="0.01" disabled={savingRows}
+                        aria-label={`Regular price for ${product.name}`}
+                        value={editedRows[product.id]?.price ?? String(product.price)}
+                        onChange={(event) => editRow(product, "price", event.target.value)}
+                        className="block w-24 rounded border p-1.5 font-bold text-gray-800" />
+                    </label>
+                    <label className="mt-1 block text-xs text-gray-500">Sale
+                      <input type="number" min="0" step="0.01" disabled={savingRows}
+                        aria-label={`Sale price for ${product.name}`}
+                        value={editedRows[product.id]?.discountPrice ?? (product.discountPrice === null ? "" : String(product.discountPrice))}
+                        onChange={(event) => editRow(product, "discountPrice", event.target.value)}
+                        className="block w-24 rounded border p-1.5 font-bold text-teal-700" />
+                    </label>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
@@ -1380,6 +1590,7 @@ export default function AdminProductsPage() {
                               disabled={
                                 busyItem ===
                                   `stock:${product.id}:${variant.id}` ||
+                                savingRows || Boolean(editedRows[product.id]) ||
                                 variant.stock <= 0
                               }
                               onClick={() =>
@@ -1398,7 +1609,8 @@ export default function AdminProductsPage() {
                               type="button"
                               disabled={
                                 busyItem ===
-                                `stock:${product.id}:${variant.id}`
+                                `stock:${product.id}:${variant.id}` ||
+                                savingRows || Boolean(editedRows[product.id])
                               }
                               onClick={() =>
                                 void handleQuickStockAdjust(
@@ -1423,6 +1635,7 @@ export default function AdminProductsPage() {
                         type="button"
                         disabled={
                           product.variants.length > 0 ||
+                          savingRows || Boolean(editedRows[product.id]) ||
                           busyItem === `stock:${product.id}:product` ||
                           product.stock <= 0
                         }
@@ -1439,19 +1652,18 @@ export default function AdminProductsPage() {
                       >
                         −
                       </button>
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-bold ${
-                          product.stock > 0
-                            ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"
-                        }`}
-                      >
-                        {product.stock} in stock
-                      </span>
+                      <input type="number" min="0" step="1"
+                        aria-label={`Stock for ${product.name}`}
+                        title={product.variants.length ? "Adjust stock on each variant" : "Stock"}
+                        disabled={savingRows || product.variants.length > 0}
+                        value={editedRows[product.id]?.stock ?? String(product.stock)}
+                        onChange={(event) => editRow(product, "stock", event.target.value)}
+                        className="w-20 rounded border p-1.5 text-xs disabled:bg-gray-100" />
                       <button
                         type="button"
                         disabled={
                           product.variants.length > 0 ||
+                          savingRows || Boolean(editedRows[product.id]) ||
                           busyItem === `stock:${product.id}:product`
                         }
                         onClick={() =>
@@ -1470,9 +1682,23 @@ export default function AdminProductsPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
+                    {editedRows[product.id] && (
+                      <button type="button" disabled={savingRows || Boolean(busyItem)}
+                        onClick={() => void saveEditedRows(product.id)}
+                        aria-label={`Save ${product.name}`} title="Save inline changes"
+                        className="mr-1 rounded bg-green-700 p-1.5 text-white disabled:opacity-50">
+                        <Save className="h-4 w-4" />
+                      </button>
+                    )}
+                    <button type="button" disabled={savingRows || Boolean(editedRows[product.id]) || Boolean(busyItem)}
+                      onClick={() => setEditingProduct(product)}
+                      aria-label={`Edit ${product.name}`} title="Edit product details"
+                      className="mr-1 rounded border p-1.5 text-gray-600 disabled:opacity-50">
+                      <Pencil className="h-4 w-4" />
+                    </button>
                     <button
                       type="button"
-                      disabled={busyItem === `flash-sale:${product.id}`}
+                      disabled={savingRows || Boolean(editedRows[product.id]) || busyItem === `flash-sale:${product.id}`}
                       onClick={() =>
                         void handleToggleProductFlashSale(product)
                       }
@@ -1482,7 +1708,7 @@ export default function AdminProductsPage() {
                     </button>
                     <button
                       type="button"
-                      disabled={busyItem === `status:${product.id}`}
+                      disabled={savingRows || Boolean(editedRows[product.id]) || busyItem === `status:${product.id}`}
                       onClick={() => void handleToggleProductActive(product)}
                       className="mr-1 rounded border px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                     >
@@ -1490,7 +1716,7 @@ export default function AdminProductsPage() {
                     </button>
                     <button
                       type="button"
-                      disabled={busyItem === `product:${product.id}`}
+                      disabled={savingRows || Boolean(editedRows[product.id]) || busyItem === `product:${product.id}`}
                       onClick={() => void handleDeleteProduct(product)}
                       className="rounded p-1.5 text-red-600 hover:bg-red-50 disabled:opacity-50"
                       title="Delete product"
@@ -1505,6 +1731,24 @@ export default function AdminProductsPage() {
           </tbody>
         </table>
       </section>
+      {editingProduct && (
+        <AdminProductEditor
+          key={editingProduct.id}
+          product={editingProduct}
+          categories={categories}
+          primaryColor={settings.primaryColor}
+          getApiError={getApiError}
+          onClose={() => setEditingProduct(null)}
+          onSaved={async () => {
+            try {
+              await refreshData();
+              notify("Product updated.");
+            } catch (refreshError) {
+              setError(`Product saved, but refreshing failed: ${refreshError instanceof Error ? refreshError.message : "Request failed"}`);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

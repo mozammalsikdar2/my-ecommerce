@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "db:seed:catalog": "tsx prisma/seed-products.ts",
+    "seed:products": "tsx prisma/seed-products.ts",
+    "seed:products:reset": "tsx prisma/seed-products.ts --force"
   },
   "dependencies": {
     "@next/third-parties": "^16.4.6",

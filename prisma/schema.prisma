@@ -41,7 +41,76 @@ model SiteSettings {
   whatsappNumber String @default("8801700000000")
   messengerUsername String @default("") // Facebook Page username or numeric Page ID for m.me link
 
-  announcementText      String    @default("Free Delivery on orders over 2,000 BDT! Cash on Delivery Available.")
+  loginBgImageUrl         String  @default("")
+  loginGoldColor          String  @default("#E5B842")
+  loginEmeraldColor       String  @default("#117A5B")
+  loginCardOpacity        Int     @default(62)
+  adminLoginBackText      String  @default("Back to ALIF STORE")
+  adminLoginBadgeText     String  @default("SECURE ACCESS • SSL Encrypted Session")
+  adminLoginEyebrow       String  @default("RESTRICTED ACCESS")
+  adminLoginTitle         String  @default("Admin Login Dashboard")
+  adminLoginSubtitle      String  @default("Sign in with your Administrator or Moderator credentials to manage products, orders, payments, and site settings.")
+  adminEmailLabel         String  @default("Admin Email Address")
+  adminEmailPlaceholder   String  @default("admin@example.com")
+  adminPasswordLabel      String  @default("Password")
+  adminForgotText         String  @default("Forgot Password?")
+  adminButtonText         String  @default("Access Admin Dashboard")
+  adminSwitchPrompt       String  @default("Shopping as a customer?")
+  adminSwitchLinkText     String  @default("Go to User Login")
+  showAdminUserSwitchLink Boolean @default(true)
+  userLoginBackText       String  @default("Back to ALIF STORE")
+  userLoginBadgeText      String  @default("CUSTOMER PORTAL • SSL Encrypted Session")
+  userLoginEyebrow        String  @default("MEMBER ACCESS")
+  userLoginTitle          String  @default("Customer Login")
+  userLoginSubtitle       String  @default("Sign in to track your orders, manage saved delivery addresses, and access your wishlist.")
+  userRegisterTitle       String  @default("Create Customer Account")
+  userRegisterSubtitle    String  @default("Register now for faster checkout, order tracking, and exclusive member discounts.")
+  userEmailLabel          String  @default("Email Address")
+  userEmailPlaceholder    String  @default("you@example.com")
+  userPasswordLabel       String  @default("Password")
+  userForgotText          String  @default("Forgot Password?")
+  userButtonText          String  @default("Sign In to Account")
+  userRegisterButtonText  String  @default("Create Account")
+  userRegistrationEnabled Boolean @default(true)
+  userSwitchPrompt        String  @default("Store administrator?")
+  userSwitchLinkText      String  @default("Admin Login")
+  showUserAdminSwitchLink Boolean @default(false)
+
+  headerTopBgColor        String  @default("#152c5b")
+  headerMainBgColor       String  @default("#1f3e7a")
+  headerSearchBtnColor    String  @default("#f97316")
+  categoryBarBgColor      String  @default("#ffffff")
+  showTopUtilityBar       Boolean @default(true)
+  storeLocationsText      String  @default("STORE LOCATIONS")
+  storeLocationsUrl       String  @default("/contact")
+  storeLocationsIconUrl   String  @default("")
+  trackOrderText          String  @default("Track Order")
+  showTrackOrder          Boolean @default(true)
+  defaultLanguage         String  @default("EN")
+  enableLanguageSwitcher  Boolean @default(true)
+  showCameraSearchIcon    Boolean @default(true)
+  cameraIconUrl           String  @default("")
+  accountIconUrl          String  @default("")
+  cartIconUrl             String  @default("")
+  showHeaderMessenger     Boolean @default(true)
+  headerMessengerIconUrl  String  @default("")
+  showHeaderWhatsapp      Boolean @default(true)
+  headerWhatsappIconUrl   String  @default("")
+  showHeaderCall          Boolean @default(true)
+  headerCallNumber        String  @default("01984361250")
+  headerCallLabel         String  @default("Hotline")
+  headerCallIconUrl       String  @default("")
+  showBottomWhatsapp      Boolean @default(true)
+  bottomWhatsappIconUrl   String  @default("")
+  showBottomMessenger     Boolean @default(true)
+  bottomMessengerIconUrl  String  @default("")
+  showBottomCall          Boolean @default(false)
+  bottomCallIconUrl       String  @default("")
+  footerFacebookIconUrl   String  @default("")
+  footerInstagramIconUrl  String  @default("")
+  footerYoutubeIconUrl    String  @default("")
+
+  announcementText      String    @default("সারা বাংলাদেশে ক্যাশ অন ডেলিভারি")
   heroTitle             String    @default("Discover Exclusive Collections for Everyday Life")
   heroSubtitle          String    @default("Shop top-rated products with fast nationwide delivery and 100% authentic guarantee.")
   heroButtonText        String    @default("Shop Now")
@@ -104,9 +173,12 @@ model Coupon {
 
 model Category {
   id            String        @id @default(cuid())
-  name          String
+  name          String        @unique
   slug          String        @unique
+  description   String?
   imageUrl      String?
+  iconUrl       String?
+  sortOrder     Int           @default(0)
   subCategories SubCategory[]
   products      Product[]
   createdAt     DateTime      @default(now())
@@ -125,16 +197,17 @@ model SubCategory {
 
 model Product {
   id            String           @id @default(cuid())
+  sku           String?          @unique
   name          String
   slug          String           @unique
-  description   String?
+  description   String           @default("")
   price         Float
   discountPrice Float?
-  stock         Int              @default(0)
+  stock         Int              @default(25)
   image         String
   images        String[]         @default([])
-  categoryId    String?
-  category      Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId    String
+  category      Category         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   subCategoryId String?
   subCategory   SubCategory?     @relation(fields: [subCategoryId], references: [id], onDelete: SetNull)
   variants      ProductVariant[]
@@ -145,6 +218,8 @@ model Product {
   updatedAt     DateTime         @updatedAt
   orderItems    OrderItem[]
   wishlistedBy  WishlistItem[]
+
+  @@index([categoryId])
 }
 
 model ProductVariant {

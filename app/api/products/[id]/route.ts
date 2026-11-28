@@ -11,6 +11,7 @@ import {
   parseProductVariants,
 } from "@/lib/product-utils";
 import { requireRole } from "@/lib/auth-guard";
+import { deleteProduct } from "@/lib/product-delete";
 import { staffAuthorizationError } from "@/lib/user-auth";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -54,6 +55,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
 
   const allowedFields = new Set([
     "name",
+    "sku",
     "description",
     "price",
     "discountPrice",
@@ -85,6 +87,15 @@ export async function PUT(request: Request, { params }: RouteContext) {
     }
     data.name = body.name.trim();
   }
+  if ("sku" in body) {
+    if (
+      body.sku !== null &&
+      (typeof body.sku !== "string" || body.sku.trim().length > 100)
+    ) {
+      return Response.json({ error: "sku must be a string of at most 100 characters or null" }, { status: 400 });
+    }
+    data.sku = typeof body.sku === "string" ? body.sku.trim() || null : null;
+  }
   if ("slug" in body) {
     if (
       typeof body.slug !== "string" ||
@@ -104,7 +115,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
         { status: 400 },
       );
     }
-    data.description = body.description;
+    data.description = body.description ?? "";
   }
   if ("price" in body) {
     if (
@@ -144,16 +155,14 @@ export async function PUT(request: Request, { params }: RouteContext) {
   let resultingSubCategoryId = existing.subCategoryId;
   if ("categoryId" in body) {
     if (
-      body.categoryId !== null &&
-      (typeof body.categoryId !== "string" || body.categoryId.trim().length === 0)
+      typeof body.categoryId !== "string" || body.categoryId.trim().length === 0
     ) {
       return Response.json(
-        { error: "categoryId must be a non-empty string or null" },
+        { error: "categoryId must be a non-empty string" },
         { status: 400 },
       );
     }
-    resultingCategoryId =
-      typeof body.categoryId === "string" ? body.categoryId.trim() : null;
+    resultingCategoryId = body.categoryId.trim();
   }
   if ("subCategoryId" in body) {
     if (
@@ -196,9 +205,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
     }
   }
   if ("categoryId" in body) {
-    data.category = resultingCategoryId
-      ? { connect: { id: resultingCategoryId } }
-      : { disconnect: true };
+    data.category = { connect: { id: resultingCategoryId } };
   }
   if ("subCategoryId" in body) {
     data.subCategory = resultingSubCategoryId
@@ -291,7 +298,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === "P2002") {
         return Response.json(
-          { error: "A product with this slug already exists" },
+          { error: "A product with this slug or SKU already exists" },
           { status: 409 },
         );
       }
@@ -555,21 +562,5 @@ export async function DELETE(request: Request, { params }: RouteContext) {
   if (errorResponse) return errorResponse;
 
   const { id } = await params;
-  try {
-    const product = await prisma.product.delete({ where: { id } });
-    return Response.json(product);
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === "P2025") {
-        return Response.json({ error: "Product not found" }, { status: 404 });
-      }
-      if (error.code === "P2003") {
-        return Response.json(
-          { error: "Product cannot be deleted because it belongs to an order" },
-          { status: 409 },
-        );
-      }
-    }
-    throw error;
-  }
+  return deleteProduct(id);
 }

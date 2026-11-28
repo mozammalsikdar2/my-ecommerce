@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
+import LuxuryAuthShell from "@/components/LuxuryAuthShell";
 import {
   ArrowRight,
   Eye,
@@ -32,7 +33,8 @@ export default function LoginPage() {
   const { refreshUser } = useAuth();
   const router = useRouter();
 
-  const [isRegister, setIsRegister] = useState(false);
+  const [registrationRequested, setIsRegister] = useState(false);
+  const isRegister = registrationRequested && settings.userRegistrationEnabled;
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState<AccountForm>({
     name: "",
@@ -136,29 +138,29 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="mx-auto flex min-h-[80vh] max-w-md items-center px-4 py-12">
-      <div className="w-full rounded-2xl border bg-white p-8 shadow-sm">
+    <LuxuryAuthShell
+      backText={settings.userLoginBackText}
+      badgeText={settings.userLoginBadgeText}
+    >
         <div className="text-center">
-          <div
-            style={{
-              backgroundColor: `${settings.primaryColor}15`,
-              color: settings.primaryColor,
-            }}
-            className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl"
+          <p
+            style={{ color: settings.loginGoldColor }}
+            className="text-[10px] font-bold uppercase tracking-[0.22em]"
           >
-            <User className="h-6 w-6" />
-          </div>
-          <h1 className="mt-4 text-2xl font-extrabold text-gray-900">
-            {isRegister ? "Create Customer Account" : "Login Account"}
+            {settings.userLoginEyebrow}
+          </p>
+          <h1 className="mt-1.5 text-2xl font-extrabold tracking-tight text-white">
+            {isRegister ? settings.userRegisterTitle : settings.userLoginTitle}
           </h1>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mx-auto mt-2 max-w-[330px] text-xs leading-relaxed text-gray-300">
             {isRegister
-              ? `Join ${settings.storeName} to track orders and save your wishlist.`
-              : `Log in to your ${settings.storeName} account to view orders and profile.`}
+              ? settings.userRegisterSubtitle
+              : settings.userLoginSubtitle}
           </p>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 rounded-xl bg-gray-100 p-1">
+        {settings.userRegistrationEnabled && (
+        <div className="mt-4 grid grid-cols-2 rounded-lg border border-white/10 bg-black/35 p-1">
           <button
             type="button"
             onClick={() => {
@@ -166,13 +168,12 @@ export default function LoginPage() {
               setError(null);
               setShowAdminLoginLink(false);
             }}
-            className={`rounded-lg py-2 text-xs font-bold transition ${
-              !isRegister
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-800"
+            style={!isRegister ? { backgroundColor: `${settings.loginGoldColor}25`, color: settings.loginGoldColor } : undefined}
+            className={`rounded-md py-1.5 text-xs font-bold transition ${
+              !isRegister ? "shadow-xs" : "text-gray-400 hover:text-white"
             }`}
           >
-            Login Account
+            Sign In
           </button>
           <button
             type="button"
@@ -181,23 +182,23 @@ export default function LoginPage() {
               setError(null);
               setShowAdminLoginLink(false);
             }}
-            className={`rounded-lg py-2 text-xs font-bold transition ${
-              isRegister
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-800"
+            style={isRegister ? { backgroundColor: `${settings.loginGoldColor}25`, color: settings.loginGoldColor } : undefined}
+            className={`rounded-md py-1.5 text-xs font-bold transition ${
+              isRegister ? "shadow-xs" : "text-gray-400 hover:text-white"
             }`}
           >
-            Create Account
+            Register
           </button>
         </div>
+        )}
 
         {error && (
           <div
             role="alert"
-            className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700"
+            className="mt-4 rounded-lg border border-red-400/40 bg-red-950/60 px-3.5 py-2.5 text-xs font-medium text-red-200"
           >
             <p>{error}</p>
-            {showAdminLoginLink && (
+            {showAdminLoginLink && settings.showUserAdminSwitchLink && (
               <Link
                 href="/admin/login"
                 className="mt-1.5 inline-block font-extrabold underline"
@@ -214,12 +215,12 @@ export default function LoginPage() {
               <div>
                 <label
                   htmlFor="register-name"
-                  className="block text-xs font-bold text-gray-700"
+                  className="block text-xs font-medium text-gray-200"
                 >
-                  Full Name *
+                  Full Name <span className="text-amber-400">*</span>
                 </label>
-                <div className="relative mt-1">
-                  <User className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                <div className="relative mt-1.5">
+                  <User aria-hidden="true" className="pointer-events-none absolute left-3.5 top-3 h-4 w-4 text-gray-400" />
                   <input
                     id="register-name"
                     type="text"
@@ -229,7 +230,7 @@ export default function LoginPage() {
                     placeholder="Enter your full name"
                     value={form.name}
                     onChange={(event) => updateForm("name", event.target.value)}
-                    className="w-full rounded-xl border py-2.5 pl-9 pr-3 text-sm"
+                    className="w-full rounded-lg border border-white/15 bg-black/35 py-2.5 pl-10 pr-3 text-sm text-white placeholder-gray-400 focus:border-amber-400/70 focus:bg-black/50 focus:outline-none"
                   />
                 </div>
               </div>
@@ -237,12 +238,12 @@ export default function LoginPage() {
               <div>
                 <label
                   htmlFor="register-phone"
-                  className="block text-xs font-bold text-gray-700"
+                  className="block text-xs font-medium text-gray-200"
                 >
-                  Mobile Number *
+                  Mobile Number <span className="text-amber-400">*</span>
                 </label>
-                <div className="relative mt-1">
-                  <Phone className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                <div className="relative mt-1.5">
+                  <Phone aria-hidden="true" className="pointer-events-none absolute left-3.5 top-3 h-4 w-4 text-gray-400" />
                   <input
                     id="register-phone"
                     type="tel"
@@ -254,7 +255,7 @@ export default function LoginPage() {
                     onChange={(event) =>
                       updateForm("phone", event.target.value)
                     }
-                    className="w-full rounded-xl border py-2.5 pl-9 pr-3 text-sm"
+                    className="w-full rounded-lg border border-white/15 bg-black/35 py-2.5 pl-10 pr-3 text-sm text-white placeholder-gray-400 focus:border-amber-400/70 focus:bg-black/50 focus:outline-none"
                   />
                 </div>
               </div>
@@ -264,12 +265,12 @@ export default function LoginPage() {
           <div>
             <label
               htmlFor={isRegister ? "account-email" : "account-identifier"}
-              className="block text-xs font-bold text-gray-700"
+              className="block text-xs font-medium text-gray-200"
             >
-              {isRegister ? "Email Address *" : "Email or Phone Number *"}
+              {settings.userEmailLabel}{!isRegister && " / Phone Number"} <span className="text-amber-400">*</span>
             </label>
-            <div className="relative mt-1">
-              <Mail className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+            <div className="relative mt-1.5">
+              <Mail aria-hidden="true" className="pointer-events-none absolute left-3.5 top-3 h-4 w-4 text-gray-400" />
               <input
                 id={isRegister ? "account-email" : "account-identifier"}
                 type={isRegister ? "email" : "text"}
@@ -277,7 +278,7 @@ export default function LoginPage() {
                 required
                 maxLength={254}
                 placeholder={
-                  isRegister ? "you@example.com" : "Email or 017XXXXXXXX"
+                  isRegister ? settings.userEmailPlaceholder : `${settings.userEmailPlaceholder} / 017XXXXXXXX`
                 }
                 value={isRegister ? form.email : form.loginIdentifier}
                 onChange={(event) =>
@@ -286,7 +287,7 @@ export default function LoginPage() {
                     event.target.value,
                   )
                 }
-                className="w-full rounded-xl border py-2.5 pl-9 pr-3 text-sm"
+                className="w-full rounded-lg border border-white/15 bg-black/35 py-2.5 pl-10 pr-3 text-sm text-white placeholder-gray-400 focus:border-amber-400/70 focus:bg-black/50 focus:outline-none"
               />
             </div>
           </div>
@@ -294,24 +295,24 @@ export default function LoginPage() {
           <div>
             <label
               htmlFor="account-password"
-              className="block text-sm font-medium text-gray-700"
+              className="block text-xs font-medium text-gray-200"
             >
-              Password <span className="text-red-500">*</span>
+              {settings.userPasswordLabel} <span className="text-amber-400">*</span>
             </label>
-            <div className="relative mt-1">
-              <Lock className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+            <div className="relative mt-1.5">
+              <Lock aria-hidden="true" className="pointer-events-none absolute left-3.5 top-3 h-4 w-4 text-gray-400" />
               <input
                 id="account-password"
                 type={showPassword ? "text" : "password"}
                 autoComplete={isRegister ? "new-password" : "current-password"}
                 required
                 minLength={isRegister ? 8 : undefined}
-                placeholder="Enter your password"
+                placeholder="••••••••"
                 value={form.password}
                 onChange={(event) =>
                   updateForm("password", event.target.value)
                 }
-                className="w-full rounded-xl border py-2.5 pl-9 pr-10 text-sm"
+                className="w-full rounded-lg border border-white/15 bg-black/35 py-2.5 pl-10 pr-10 text-sm text-white placeholder-gray-400 focus:border-amber-400/70 focus:bg-black/50 focus:outline-none"
               />
               <button
                 type="button"
@@ -319,7 +320,7 @@ export default function LoginPage() {
                   setShowPassword((current) => !current)
                 }
                 aria-label={showPassword ? "Hide password" : "Show password"}
-                className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-700"
+                className="absolute right-3.5 top-3 text-gray-400 hover:text-white"
               >
                 {showPassword ? (
                   <EyeOff className="h-4 w-4" />
@@ -332,10 +333,10 @@ export default function LoginPage() {
               <div className="mt-2 flex justify-end">
                 <Link
                   href="/forgot-password"
-                  style={{ color: settings.primaryColor }}
-                  className="text-sm font-medium hover:underline"
+                  style={{ color: settings.loginGoldColor }}
+                  className="text-xs font-medium opacity-90 hover:underline hover:opacity-100"
                 >
-                  Forgot Password?
+                  {settings.userForgotText}
                 </Link>
               </div>
             )}
@@ -344,20 +345,29 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={submitting}
-            style={{ backgroundColor: settings.primaryColor }}
-            className="flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold text-white shadow-lg transition hover:opacity-90 disabled:opacity-50"
+            style={{
+              background: `linear-gradient(90deg, ${settings.loginGoldColor} 0%, ${settings.loginGoldColor} 42%, ${settings.loginEmeraldColor} 100%)`,
+            }}
+            className="flex w-full items-center justify-center gap-2 rounded-lg py-3 text-sm font-extrabold text-gray-950 shadow-[0_8px_25px_rgba(229,184,66,0.28)] transition hover:brightness-110 disabled:opacity-50"
           >
             <span>
               {submitting
                 ? "Please wait..."
                 : isRegister
-                  ? "Create Account"
-                  : "Login Account"}
+                  ? settings.userRegisterButtonText
+                  : settings.userButtonText}
             </span>
             <ArrowRight className="h-4 w-4" />
           </button>
         </form>
-      </div>
-    </div>
+        {settings.showUserAdminSwitchLink && (
+          <div className="mt-4 pt-2 text-center text-xs text-gray-300">
+            {settings.userSwitchPrompt}{" "}
+            <Link href="/admin/login" className="font-semibold text-white underline-offset-4 hover:underline">
+              {settings.userSwitchLinkText}
+            </Link>
+          </div>
+        )}
+    </LuxuryAuthShell>
   );
 }

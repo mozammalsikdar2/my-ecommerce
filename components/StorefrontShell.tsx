@@ -19,6 +19,10 @@ export default function StorefrontShell({
     return <AuthProvider portal="admin">{children}</AuthProvider>;
   }
 
+  if (pathname === "/login" || pathname === "/forgot-password") {
+    return <>{children}</>;
+  }
+
   return (
     <>
       <Navbar />
